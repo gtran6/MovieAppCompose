@@ -11,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
@@ -18,9 +19,11 @@ import androidx.compose.foundation.layout.paddingFromBaseline
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -30,7 +33,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.material3.TextFieldDefaults
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -38,39 +40,56 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.Observer
-import androidx.lifecycle.viewmodel.viewModelFactory
 import coil.compose.AsyncImage
 import com.myprojects.movieappcompose.api.Events
-import com.myprojects.movieappcompose.repository.MainRepository
 import com.myprojects.movieappcompose.ui.theme.MovieAppComposeTheme
 import com.myprojects.movieappcompose.viewmodel.MovieViewModel
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.livedata.observeAsState
+import dagger.hilt.android.AndroidEntryPoint
 
+@AndroidEntryPoint
 class MainActivity : ComponentActivity() {
     private val movieViewModel: MovieViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            movieViewModel.getNowPlayingMovieList()
-            movieViewModel.popularList.observe(this, Observer {
-                when (it) {
+            MovieAppComposeTheme {
+                val nowPlayingList by movieViewModel.nowPlayingList.observeAsState(Events.Loading())
+
+                when (val state = nowPlayingList) {
                     is Events.Loading -> {
-
-                    }
-                    is Events.Success -> {
-
+                        CircularProgressIndicator()
                     }
                     is Events.Error -> {
-
+                        Text(text = "Error: ${state.msg}")
+                    }
+                    is Events.Success -> {
+                        LazyRow(
+                            modifier = Modifier,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                            contentPadding = PaddingValues(horizontal = 16.dp)
+                        ) {
+                            val movieList = state.data ?: emptyList()
+                            items(movieList) { item ->
+                                NowPlayingElement(
+                                    imageUrl = item.poster_path,
+                                    title = item.title
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+                        }
+                    }
+                    else -> {
+                        Text(text = "No data available.")
                     }
                 }
-            })
+            }
         }
     }
 }
+
 @Composable
 fun SearchBar(
     modifier: Modifier = Modifier
@@ -160,38 +179,36 @@ fun NowPlayingRow(
     modifier: Modifier = Modifier,
     movieViewModel: MovieViewModel
 ) {
+    val nowPlayingList by movieViewModel.nowPlayingList.observeAsState(Events.Loading())
 
-    val postState = movieViewModel.nowPlayingList.observeAsState()
-
-    when () {
+    when (val state = nowPlayingList) {
         is Events.Loading -> {
-
+            CircularProgressIndicator()
         }
         is Events.Error -> {
-            // Show error message
-            Text(
-                text = "Error: ${state.msg}",
-                color = Color.Red,
-                modifier = modifier.align(Alignment.Center)
-            )
+            Text(text = "Error: ${state.msg}")
         }
         is Events.Success -> {
-            // Show list of movies
             LazyRow(
-                modifier = Modifier,
+                modifier = modifier,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(horizontal = 16.dp)
             ) {
-                items(state.data) { item ->
+                items(state.data ?: emptyList()) { item ->
                     NowPlayingElement(
                         imageUrl = item.poster_path,
                         title = item.title
                     )
+                    Spacer(modifier = Modifier.width(8.dp))
                 }
             }
         }
+        else -> {
+            Text(text = "No data available.")
+        }
     }
 }
+
 
 @Composable
 fun PopularRowList() {
@@ -230,8 +247,8 @@ fun NowPlayingElementPreview() {
     MovieAppComposeTheme {
         NowPlayingElement(
             modifier = Modifier.padding(8.dp),
-            drawable = R.drawable.ic_launcher_background,
-            text = R.string.app_name
+            imageUrl = "R.drawable.ic_launcher_background",
+            title = "R.string.app_name"
         )
     }
 }
@@ -248,10 +265,11 @@ fun PopularCardPreview() {
     }
 }
 
-@Preview
+@Preview(showBackground = true)
 @Composable
 fun NowPlayingRowPreview() {
-    MovieAppComposeTheme { NowPlayingRow() }
+    MovieAppComposeTheme {
+    }
 }
 
 @Preview

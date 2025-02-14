@@ -1,6 +1,5 @@
 package com.myprojects.movieappcompose.viewmodel
 
-import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
@@ -17,15 +16,22 @@ import javax.inject.Inject
 
 @HiltViewModel
 class MovieViewModel @Inject constructor(private val repo: MainRepository) : ViewModel() {
-    private val _nowPlayingList = MutableLiveData<Events<List<Result>>>()
-    val nowPlayingList: LiveData<Events<List<Result>>> = _nowPlayingList
+    val nowPlayingList: MutableLiveData<Events<List<Result>>> = MutableLiveData()
     val popularList: MutableLiveData<Events<List<ResultX>>> = MutableLiveData()
     val upcomingList: MutableLiveData<Events<List<ResultXX>>> = MutableLiveData()
 
-    fun getNowPlayingMovieList() {
-        _nowPlayingList.value = Events.Loading()
+    init {
+        getNowPlayingMovieList()
+    }
+
+    private fun getNowPlayingMovieList() {
         viewModelScope.launch {
-            _nowPlayingList.value = repo.getNowPlayingList(API_KEY)
+            nowPlayingList.postValue(Events.Loading())
+            repo.getNowPlayingList(API_KEY).catch {
+                nowPlayingList.postValue(Events.Error(msg = it.localizedMessage))
+            }.collect { list ->
+                nowPlayingList.postValue(Events.Success(list.results))
+            }
         }
     }
 
